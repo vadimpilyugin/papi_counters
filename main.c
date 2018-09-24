@@ -47,7 +47,7 @@ int main() {
   handle_error(retval);
 
 
-  long_long values[4];
+  long_long values[3];
   while (1) {
     retval = PAPI_start(EventSet);
     handle_error(retval);
@@ -63,9 +63,9 @@ int main() {
 
     printf("L1_DCM: %lld, ",values[0]);
     printf("L1_ICM: %lld, ",values[1]);
-    printf("L1_TCM: %lld, ",values[2]);
-    printf("TLB_DM: %lld\n",values[3]);
-    memset(values, 0, sizeof(values));
+    printf("TLB_DM: %lld\n",values[2]);
+    
+    memset(values, 0, sizeof(values)); // maybe unnecessary
   }
 
   printf("Hello, world!\n");

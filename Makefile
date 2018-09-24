@@ -14,4 +14,4 @@ clean:
 
 .PHONY: test
 test: attach_cpu.c
-	gcc -o test_attach attach_cpu.c ${LIBPATH}/libpapi.a && ./test_attach
+	gcc -o test_attach attach_cpu.c ${LIBPATH}/libpapi.a
