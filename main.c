@@ -12,42 +12,33 @@ int main() {
     exit(1);
   }
   
-  int event = PAPI_L1_DCM;
-  retval = PAPI_query_event(event);
-  handle_error(retval);
-  
   int EventSet = PAPI_NULL;
   retval = PAPI_create_eventset(&EventSet);
   handle_error(retval);
   
   retval = PAPI_assign_eventset_component(EventSet, 0);
   handle_error(retval);
+
   retval = PAPI_num_cmp_hwctrs(0);
-  printf("Number of hardware counters available: %d\n", retval); 
+  printf("Number of hardware counters available: %d\n", retval);
+  if (retval < 3) {
+    fprintf(stderr, "%s\n", "Not enough counters to count events");
+    exit(1);
+  }
+
+  // Добавляем события, которые хотим считать:
+  // PAPI_L1_DCM  0x80000000  Yes   No   Level 1 data cache misses
+  // PAPI_L1_ICM  0x80000001  Yes   No   Level 1 instruction cache misses
+  // PAPI_TLB_DM  0x80000014  Yes   Yes  Data translation lookaside buffer misses
+
   retval = PAPI_add_event(EventSet, PAPI_L1_DCM);
   handle_error(retval);
   retval = PAPI_add_event(EventSet, PAPI_L1_ICM);
-  handle_error(retval);
-  retval = PAPI_add_event(EventSet, PAPI_L1_TCM);
   handle_error(retval);
   retval = PAPI_add_event(EventSet, PAPI_TLB_DM);
   handle_error(retval);
 
   PAPI_option_t opts;
-
-  memset(&opts, 0, sizeof(opts));
-  opts.granularity.def_cidx = 0;
-  opts.granularity.eventset = EventSet;
-  opts.granularity.granularity = PAPI_GRN_SYS;
-  retval = PAPI_set_opt(PAPI_GRANUL, &opts);
-  handle_error(retval);
-
-  memset(&opts, 0, sizeof(opts));
-  opts.domain.def_cidx = 0;
-  opts.domain.eventset = EventSet;
-  opts.domain.domain = PAPI_DOM_USER;
-  retval = PAPI_set_opt(PAPI_DOMAIN, &opts);
-  handle_error(retval);
 
   memset(&opts, 0, sizeof(opts));
   opts.cpu.eventset = EventSet;
@@ -63,12 +54,10 @@ int main() {
 
     sleep(1);
 
-    retval = PAPI_accum(EventSet, values);
+    retval = PAPI_stop(EventSet, values);
     handle_error(retval);
 
-    // retval = PAPI_stop(EventSet, values);
-    // handle_error(retval);
-
+    // PAPI_reset() zeroes the values of the counters contained in EventSet
     retval = PAPI_reset(EventSet);
     handle_error(retval);
 
