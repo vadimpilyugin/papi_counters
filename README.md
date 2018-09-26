@@ -7,7 +7,7 @@ C script for counting hardware events
 застревают на них. После какого-то времени они сбрасываются и перестают считать события, хотя нагрузка не исчезла.
 
 Иногда программа вообще не начинает считать события:
-Number of hardware counters available: 10
+```Number of hardware counters available: 10
 L1_TCM: 5, TOT_INS: 39, TLB_DM: 0
 L1_TCM: 5, TOT_INS: 39, TLB_DM: 0
 L1_TCM: 5, TOT_INS: 39, TLB_DM: 0
@@ -15,3 +15,4 @@ L1_TCM: 5, TOT_INS: 39, TLB_DM: 0
 L1_TCM: 5, TOT_INS: 39, TLB_DM: 0
 L1_TCM: 5, TOT_INS: 39, TLB_DM: 0
 --- and so on ---
+```
