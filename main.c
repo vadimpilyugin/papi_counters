@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
     printf("L1_TCM: %lld, ",values[0]);
     printf("TOT_INS: %lld, ",values[1]);
     printf("TLB_DM: %lld\n",values[2]);
+    fflush(stdout);
   }
 
   printf("Hello, world!\n");

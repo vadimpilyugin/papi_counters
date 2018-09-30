@@ -4,14 +4,15 @@ LIBPATH=libs
 all: main test
 
 main: main.c perror.c
-	gcc -o main main.c perror.c ${LIBPATH}/libpapi.a
+	gcc -o main main.c perror.c ${LIBPATH}/libpapi.a -I headers
 
 .PHONY: clean
-clean: 
+clean:
 	rm -f main
 	rm -f attach_cpu
 	rm -f test_attach
+	rm -f testprog
 
 .PHONY: test
-test: attach_cpu.c
-	gcc -o test_attach attach_cpu.c ${LIBPATH}/libpapi.a
+test: testprog.c
+	gcc -o testprog testprog.c ${LIBPATH}/libpapi.a -I headers
