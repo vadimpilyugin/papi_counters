@@ -1,10 +1,12 @@
-LIBPATH=libs
+LIB_VERSION=5.5.0
+
+LIBPATH=libs/papi-${LIB_VERSION}/src
 
 .PHONY: all
 all: main test
 
 main: main.c perror.c
-	gcc -o main main.c perror.c ${LIBPATH}/libpapi.a -I headers
+	gcc -o main main.c perror.c ${LIBPATH}/libpapi.a -I headers -I ${LIBPATH}
 
 .PHONY: clean
 clean:
@@ -15,4 +17,4 @@ clean:
 
 .PHONY: test
 test: testprog.c
-	gcc -o testprog testprog.c ${LIBPATH}/libpapi.a -I headers
+	gcc -o testprog testprog.c ${LIBPATH}/libpapi.a -I headers -I ${LIBPATH}
