@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
     EventSets[i] = create_eventset(events, n_events);
     attach_to_cpu_core(EventSets[i], i);
   }
-  start_eventsets(EventSets, 2);
+  start_eventsets(EventSets, N_CORES);
   
   long_long values[MAX_EVENTS];
 
