@@ -5,18 +5,16 @@
 #include "string.h"
 #include "unistd.h"
 
-int main(int argc, char **argv) {
-  if (argc < 2) {
-    fprintf(stderr, "%s\n", "Usage: ./main [CPU TO TRACE]");
-    exit(1);
-  }
+#define MAX_EVENTS 10
+#define MAX_CORES 24
+#define N_CORES 4
 
-  int retval = PAPI_library_init(PAPI_VER_CURRENT);
-  if (retval != PAPI_VER_CURRENT) {
-    fprintf(stderr, "%s\n", "Library initialization failed");
-    exit(1);
-  }
-  
+int retval;
+
+int create_eventset(char *events[], int len) {
+
+  /* Create EventSet with specified events */
+
   int EventSet = PAPI_NULL;
   retval = PAPI_create_eventset(&EventSet);
   handle_error(retval);
@@ -24,6 +22,55 @@ int main(int argc, char **argv) {
   retval = PAPI_assign_eventset_component(EventSet, 0);
   handle_error(retval);
 
+  int i;
+  for (i = 0; i < len; i++) {
+    retval = PAPI_add_named_event(EventSet, events[i]);
+    if (retval != PAPI_OK) {
+      fprintf(stderr, "Could not add event \"%s\"\n", events[i]);
+      handle_error(retval);
+    }
+  }
+
+  return EventSet;
+}
+
+void attach_to_cpu_core(int EventSet, int cpu_num) {
+
+  /* Attach to a CPU core*/
+
+  PAPI_option_t opts;
+
+  memset(&opts, 0, sizeof(opts));
+  opts.cpu.eventset = EventSet;
+  opts.cpu.cpu_num = cpu_num;
+  retval = PAPI_set_opt(PAPI_CPU_ATTACH, &opts);
+  handle_error(retval);
+}
+
+void start_eventsets(int EventSets[], int num) {
+  int i;
+  for (i = 0; i < num; i++) {
+    retval = PAPI_start(EventSets[i]);
+    if (retval != PAPI_OK) {
+      fprintf(stderr, "Could not start EventSet[%d]\n", i);
+      handle_error(retval);
+    }
+  }
+}
+
+int main(int argc, char **argv) {
+  if (argc < 2) {
+    fprintf(stderr, "%s\n", "Usage: ./main [EVENTS]");
+    exit(1);
+  }
+  char **events = argv+1;
+  int n_events = argc-1;
+
+  retval = PAPI_library_init(PAPI_VER_CURRENT);
+  if (retval != PAPI_VER_CURRENT) {
+    fprintf(stderr, "%s\n", "Library initialization failed");
+    exit(1);
+  }
   retval = PAPI_num_cmp_hwctrs(0);
   printf("Number of hardware counters available: %d\n", retval);
   if (retval < 3) {
@@ -31,49 +78,35 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  // Добавляем события, которые хотим считать:
-  // PAPI_L1_TCM  0x80000006  Yes  Level 1 cache misses
-  // PAPI_TOT_INS 0x80000032  No   Instructions completed
-  // PAPI_TLB_DM  0x80000014  Yes   Yes  Data translation lookaside buffer misses
-
-  retval = PAPI_add_event(EventSet, PAPI_L1_TCM);
-  handle_error(retval);
-  retval = PAPI_add_event(EventSet, PAPI_TOT_INS);
-  handle_error(retval);
-  retval = PAPI_add_event(EventSet, PAPI_TLB_DM);
-  handle_error(retval);
-
-  /* Attach to CPU core 0 */
-
-  PAPI_option_t opts;
-
-  memset(&opts, 0, sizeof(opts));
-  opts.cpu.eventset = EventSet;
-  opts.cpu.cpu_num = atoi(argv[1]);
-  retval = PAPI_set_opt(PAPI_CPU_ATTACH, &opts);
-  handle_error(retval);
-
-  // pid_t pid = atoi(argv[1]);
-  // retval = PAPI_attach(EventSet, (unsigned long) pid);
-  // handle_error(retval);
-  // printf("Attached to process: %d\n", pid);
-
-  long_long values[3];
-  retval = PAPI_start(EventSet);
-  handle_error(retval);
+  int EventSets[N_CORES];
+  int i;
+  for (i = 0; i < N_CORES; i++) {
+    EventSets[i] = create_eventset(events, n_events);
+    attach_to_cpu_core(EventSets[i], i);
+  }
+  start_eventsets(EventSets, 2);
+  
+  long_long values[MAX_EVENTS];
 
   while (1) {
     sleep(1);
 
-    retval = PAPI_read(EventSet, values);
-    handle_error(retval);
+    for (i = 0; i < N_CORES; i++) {
+      retval = PAPI_read(EventSets[i], values);
+      if (retval != PAPI_OK) {
+        fprintf(stderr, "Could not read from core %d\n", i);
+        handle_error(retval);
+      }
 
-    printf("L1_TCM: %lld, ",values[0]);
-    printf("TOT_INS: %lld, ",values[1]);
-    printf("TLB_DM: %lld\n",values[2]);
+      int j;
+      printf("[ Core #%d ] ", i);
+      for (j = 0; j < n_events; j++) {
+        printf("%s: %lld, ", events[j], values[j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
     fflush(stdout);
   }
-
-  printf("Hello, world!\n");
   return 0;
 }
