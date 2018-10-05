@@ -5,11 +5,14 @@
 #include "string.h"
 #include "unistd.h"
 
-#define MAX_EVENTS 10
-#define MAX_CORES 24
-#define N_CORES 4
-
 int retval;
+struct loop_params {
+  int n_cores;
+  long long *values;
+  int *EventSets;
+  char **events;
+  int n_events;
+};
 
 int create_eventset(char *events[], int len) {
 
@@ -58,55 +61,88 @@ void start_eventsets(int EventSets[], int num) {
   }
 }
 
-int main(int argc, char **argv) {
-  if (argc < 2) {
-    fprintf(stderr, "%s\n", "Usage: ./main [EVENTS]");
+int how_many_cores() {
+  const PAPI_hw_info_t *info = PAPI_get_hardware_info();
+  if (info != NULL) {
+    return info -> totalcpus;
+  } else {
+    fprintf(stderr, "Hardware info is unavailable\n");
     exit(1);
   }
-  char **events = argv+1;
-  int n_events = argc-1;
+}
+
+void print_usage() {
+  fprintf(stderr, "%s\n", "Usage: ./main [EVENTS]");
+  exit(1);
+}
+
+struct loop_params initialize(int argc, char **argv) {
+  if (argc < 2) {
+    print_usage();
+  }
+  char **events = argv + 1;
+  int n_events = argc - 1;
 
   retval = PAPI_library_init(PAPI_VER_CURRENT);
   if (retval != PAPI_VER_CURRENT) {
     fprintf(stderr, "%s\n", "Library initialization failed");
     exit(1);
   }
+
+  int n_cores = how_many_cores();
   retval = PAPI_num_cmp_hwctrs(0);
   printf("Number of hardware counters available: %d\n", retval);
-  if (retval < 3) {
-    fprintf(stderr, "%s\n", "Not enough counters to count events");
+  if (retval < n_cores * n_events) {
+    fprintf(stderr, "Not enough counters: need %d\n", n_cores * n_events);
     exit(1);
   }
 
-  int EventSets[N_CORES];
+  int *EventSets = (int *) malloc(n_cores * sizeof(int));
   int i;
-  for (i = 0; i < N_CORES; i++) {
+  for (i = 0; i < n_cores; i++) {
     EventSets[i] = create_eventset(events, n_events);
     attach_to_cpu_core(EventSets[i], i);
   }
-  start_eventsets(EventSets, N_CORES);
-  
-  long_long values[MAX_EVENTS];
+  start_eventsets(EventSets, n_cores);
 
-  while (1) {
-    sleep(1);
+  struct loop_params lp;
+  lp.n_cores = n_cores;
+  lp.values = (long long *) malloc (n_events * sizeof(long long));
+  lp.EventSets = EventSets;
+  lp.events = events;
+  lp.n_events = n_events;
+  return lp;
+}
 
-    for (i = 0; i < N_CORES; i++) {
-      retval = PAPI_read(EventSets[i], values);
-      if (retval != PAPI_OK) {
-        fprintf(stderr, "Could not read from core %d\n", i);
-        handle_error(retval);
-      }
+void loop(struct loop_params lp) {
+  sleep(1);
 
-      int j;
-      printf("[ Core #%d ] ", i);
-      for (j = 0; j < n_events; j++) {
-        printf("%s: %lld, ", events[j], values[j]);
-      }
-      printf("\n");
+  int i;
+  for (i = 0; i < lp.n_cores; i++) {
+
+    retval = PAPI_read(lp.EventSets[i], lp.values);
+    if (retval != PAPI_OK) {
+      fprintf(stderr, "Could not read from core %d\n", i);
+      handle_error(retval);
     }
+
+    printf("[ Core #%d ] ", i);
+
+    int j;
+    for (j = 0; j < lp.n_events; j++) {
+      printf("%s: %lld, ", lp.events[j], lp.values[j]);
+    }
+
     printf("\n");
-    fflush(stdout);
+  }
+  printf("\n");
+  fflush(stdout);
+}
+
+int main(int argc, char **argv) {
+  struct loop_params lp = initialize(argc, argv);
+  while (1) {
+    loop(lp);
   }
   return 0;
 }
