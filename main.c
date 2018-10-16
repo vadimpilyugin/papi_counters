@@ -1,9 +1,10 @@
 #include "papi.h"
 #include "stdio.h"
-#include "perror.h"
 #include "stdlib.h"
 #include "string.h"
 #include "unistd.h"
+
+#define CPU_COMPONENT 0
 
 int retval;
 struct loop_params {
@@ -13,6 +14,14 @@ struct loop_params {
   char **events;
   int n_events;
 };
+
+void handle_error (int retval)
+{
+  if (retval != PAPI_OK) {
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    exit(1);
+  }
+}
 
 int create_eventset(char *events[], int len) {
 
@@ -76,21 +85,16 @@ void print_usage() {
   exit(1);
 }
 
-struct loop_params initialize(int argc, char **argv) {
-  if (argc < 2) {
-    print_usage();
-  }
-  char **events = argv + 1;
-  int n_events = argc - 1;
+void initialize(int n_events, char *events[], struct loop_params *lp) {
 
   retval = PAPI_library_init(PAPI_VER_CURRENT);
   if (retval != PAPI_VER_CURRENT) {
     fprintf(stderr, "%s\n", "Library initialization failed");
-    exit(1);
+    handle_error(retval);
   }
 
   int n_cores = how_many_cores();
-  retval = PAPI_num_cmp_hwctrs(0);
+  retval = PAPI_num_cmp_hwctrs(CPU_COMPONENT);
   printf("Number of hardware counters available: %d\n", retval);
   if (retval < n_cores * n_events) {
     fprintf(stderr, "Not enough counters: need %d\n", n_cores * n_events);
@@ -105,13 +109,11 @@ struct loop_params initialize(int argc, char **argv) {
   }
   start_eventsets(EventSets, n_cores);
 
-  struct loop_params lp;
-  lp.n_cores = n_cores;
-  lp.values = (long long *) malloc (n_events * sizeof(long long));
-  lp.EventSets = EventSets;
-  lp.events = events;
-  lp.n_events = n_events;
-  return lp;
+  lp -> n_cores = n_cores;
+  lp -> values = (long long *) malloc (n_events * sizeof(long long));
+  lp -> EventSets = EventSets;
+  lp -> events = events;
+  lp -> n_events = n_events;
 }
 
 void loop(struct loop_params lp) {
@@ -140,7 +142,13 @@ void loop(struct loop_params lp) {
 }
 
 int main(int argc, char **argv) {
-  struct loop_params lp = initialize(argc, argv);
+  if (argc < 2) {
+    print_usage();
+  }
+  char **events = argv + 1;
+  int n_events = argc - 1;
+  struct loop_params lp;
+  initialize(n_events, events, &lp);
   while (1) {
     loop(lp);
   }
