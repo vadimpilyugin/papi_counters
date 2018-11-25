@@ -5,14 +5,16 @@
 #include "unistd.h"
 
 #define CPU_COMPONENT 0
+#define DMM_MALLOC(size) malloc( (size) )
+#define DMM_FREE(ptr) free(ptr)
 
 int retval;
 struct loop_params {
-  int n_cores;
-  long long *values;
-  int *EventSets;
-  char **events;
   int n_events;
+  int n_cores;
+  char **events; // 0..n_events-1
+  long long **values; // 0..n_cores-1
+  int *EventSets; // 0..n_cores-1
 };
 
 void handle_error (int retval)
@@ -85,7 +87,7 @@ void print_usage() {
   exit(1);
 }
 
-void initialize(int n_events, char *events[], struct loop_params *lp) {
+struct loop_params * initialize(int n_events, char *events[]) {
 
   retval = PAPI_library_init(PAPI_VER_CURRENT);
   if (retval != PAPI_VER_CURRENT) {
@@ -101,7 +103,7 @@ void initialize(int n_events, char *events[], struct loop_params *lp) {
     exit(1);
   }
 
-  int *EventSets = (int *) malloc(n_cores * sizeof(int));
+  int *EventSets = (int *) DMM_MALLOC(n_cores * sizeof(int));
   int i;
   for (i = 0; i < n_cores; i++) {
     EventSets[i] = create_eventset(events, n_events);
@@ -109,36 +111,56 @@ void initialize(int n_events, char *events[], struct loop_params *lp) {
   }
   start_eventsets(EventSets, n_cores);
 
+  struct loop_params * lp = (struct loop_params *) DMM_MALLOC(sizeof(struct loop_params));
   lp -> n_cores = n_cores;
-  lp -> values = (long long *) malloc (n_events * sizeof(long long));
+  lp -> values = (long long **) DMM_MALLOC(n_cores * sizeof(long long *));
+  for (i = 0; i < n_cores; i++)
+    lp -> values[i] = (long long *) DMM_MALLOC(n_events * sizeof(long long));
   lp -> EventSets = EventSets;
   lp -> events = events;
   lp -> n_events = n_events;
+  return lp;
 }
 
-void loop(struct loop_params lp) {
-  sleep(1);
+void free_lp(struct loop_params *lp) {
+  DMM_FREE(lp -> EventSets);
+  int i = 0;
+  for (i = 0; i < lp -> n_cores; i++)
+    DMM_FREE(lp -> values[i]);
+  DMM_FREE(lp -> values);
+  DMM_FREE(lp);
+}
 
+void print_values(struct loop_params *lp) {
+  int i,j;
+  printf("\n");
+  for (i = 0; i < lp -> n_cores; i++) {
+    printf("[ Core #%d ] ", i);
+    for (j = 0; j < lp -> n_events; j++) {
+      if (j > 0)
+        printf(", ");
+      printf("%s: %lld", lp -> events[j], lp -> values[i][j]);      
+    }
+    printf("\n");
+  }
+  fflush(stdout);
+}
+
+void read_values(struct loop_params *lp) {
   int i;
-  for (i = 0; i < lp.n_cores; i++) {
-
-    retval = PAPI_read(lp.EventSets[i], lp.values);
+  for (i = 0; i < lp -> n_cores; i++) {
+    retval = PAPI_read(lp -> EventSets[i], lp -> values[i]);
     if (retval != PAPI_OK) {
       fprintf(stderr, "Could not read from core %d\n", i);
       handle_error(retval);
     }
-
-    printf("[ Core #%d ] ", i);
-
-    int j;
-    for (j = 0; j < lp.n_events; j++) {
-      printf("%s: %lld, ", lp.events[j], lp.values[j]);
-    }
-
-    printf("\n");
   }
-  printf("\n");
-  fflush(stdout);
+}
+
+void loop(struct loop_params *lp) {
+  sleep(1);
+  read_values(lp);
+  print_values(lp);
 }
 
 int main(int argc, char **argv) {
@@ -147,10 +169,10 @@ int main(int argc, char **argv) {
   }
   char **events = argv + 1;
   int n_events = argc - 1;
-  struct loop_params lp;
-  initialize(n_events, events, &lp);
+  struct loop_params * lp = initialize(n_events, events);
   while (1) {
     loop(lp);
   }
+  free_lp(lp);
   return 0;
 }

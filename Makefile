@@ -6,7 +6,7 @@ LIBPATH=libs/papi-${LIB_VERSION}/src
 all: main test
 
 main: main.c 
-	gcc -o main main.c ${LIBPATH}/libpapi.a -I headers -I ${LIBPATH}
+	gcc -o main main.c -L /usr/local/lib/ -lpapi -I headers -I ${LIBPATH}
 
 .PHONY: clean
 clean:
@@ -17,4 +17,4 @@ clean:
 
 .PHONY: test
 test: testprog.c
-	gcc -o testprog testprog.c ${LIBPATH}/libpapi.a -I headers -I ${LIBPATH}
+	gcc -o testprog testprog.c -L /usr/local/lib/ -lpapi -I headers -I ${LIBPATH}
