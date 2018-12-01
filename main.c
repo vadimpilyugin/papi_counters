@@ -5,8 +5,6 @@
 #include "unistd.h"
 
 #define CPU_COMPONENT 0
-#define DMM_MALLOC(size) malloc( (size) )
-#define DMM_FREE(ptr) free(ptr)
 
 int retval;
 struct loop_params {
@@ -103,7 +101,7 @@ struct loop_params * initialize(int n_events, char *events[]) {
     exit(1);
   }
 
-  int *EventSets = (int *) DMM_MALLOC(n_cores * sizeof(int));
+  int *EventSets = (int *)malloc(n_cores * sizeof(int));
   int i;
   for (i = 0; i < n_cores; i++) {
     EventSets[i] = create_eventset(events, n_events);
@@ -111,11 +109,11 @@ struct loop_params * initialize(int n_events, char *events[]) {
   }
   start_eventsets(EventSets, n_cores);
 
-  struct loop_params * lp = (struct loop_params *) DMM_MALLOC(sizeof(struct loop_params));
+  struct loop_params * lp = (struct loop_params *)malloc(sizeof(struct loop_params));
   lp -> n_cores = n_cores;
-  lp -> values = (long long **) DMM_MALLOC(n_cores * sizeof(long long *));
+  lp -> values = (long long **)malloc(n_cores * sizeof(long long *));
   for (i = 0; i < n_cores; i++)
-    lp -> values[i] = (long long *) DMM_MALLOC(n_events * sizeof(long long));
+    lp -> values[i] = (long long *)malloc(n_events * sizeof(long long));
   lp -> EventSets = EventSets;
   lp -> events = events;
   lp -> n_events = n_events;
@@ -123,12 +121,12 @@ struct loop_params * initialize(int n_events, char *events[]) {
 }
 
 void free_lp(struct loop_params *lp) {
-  DMM_FREE(lp -> EventSets);
+  free(lp -> EventSets);
   int i = 0;
   for (i = 0; i < lp -> n_cores; i++)
-    DMM_FREE(lp -> values[i]);
-  DMM_FREE(lp -> values);
-  DMM_FREE(lp);
+    free(lp -> values[i]);
+  free(lp -> values);
+  free(lp);
 }
 
 void print_values(struct loop_params *lp) {
